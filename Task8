@@ -1,0 +1,63 @@
+using Microsoft.Extensions.Logging;
+class Handler : IHandler
+ {
+     private readonly IConsumer _consumer;
+     private readonly IPublisher _publisher;
+     private readonly ILogger<Handler> _logger;
+
+     public TimeSpan Timeout { get; }
+
+     public Handler(
+       TimeSpan timeout,
+       IConsumer consumer,
+       IPublisher publisher,
+       ILogger<Handler> logger)
+     {
+         Timeout = timeout;
+
+         _consumer = consumer;
+         _publisher = publisher;
+         _logger = logger;
+     }
+
+     async public Task PerformOperation(CancellationToken cancellationToken)
+     {
+         //TODO: place code here
+
+         await Task.Run(() => _consumer.ReadData());
+
+
+
+         var data = _consumer.ReadData();
+
+         var readedData = data.Result;
+
+         Payload payload = readedData.Payload;
+
+         List<Task> tasks = new List<Task<SendResult>();
+
+         foreach (var recipient in readedData.Recipients)
+         {
+             var sendTask =_publisher.SendData(recipient, payload);
+             tasks.Add(SendMeesage(sendTask));
+
+         }
+
+         foreach (var task in tasks)
+         {
+             await Task.Run(() => task);
+         }
+
+         return ;
+         
+     }
+
+     async Task<SendResult> SendMeesage(Task<SendResult> result)
+     {
+         if(result.Result == SendResult.Rejected)
+         {
+             await Task.Run(() => SendMeesage(result));
+         }
+         return SendResult.Accepted;
+     }
+ }
